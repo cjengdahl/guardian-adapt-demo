@@ -1,0 +1,44 @@
+name: Security Scan with Guardian - Snyk
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Setup Snyk
+        uses: snyk/actions/setup@master
+
+      - name: Run Snyk code test
+        run: |
+          snyk code test --sarif > snyk-code-results.json || true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Process with Guardian
+        uses: SecurityJourney/guardian-action@v1.3.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          api_domain: my.securityjourney.dev
+          scan_results_path: snyk-code-results.json
+          instruction_file_path: .claude/CLAUDE.md
+          scanner_type: snyk
+          api_token: ${{ secrets.GUARDIAN_API_TOKEN }}
+          auto_commit: true
