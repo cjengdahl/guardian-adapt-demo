@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}New Post{% endblock %}
+{% block content %}
+<style>
+    h1 { font-size: 1.5rem; margin-bottom: 1.5rem; }
+    .form-group { margin-bottom: 1.25rem; }
+    label { display: block; font-family: sans-serif; font-size: 0.875rem; color: #555; margin-bottom: 0.35rem; }
+    input[type="text"], textarea {
+        width: 100%;
+        padding: 0.6rem 0.75rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 1rem;
+        font-family: Georgia, serif;
+    }
+    input[type="text"]:focus, textarea:focus {
+        outline: none;
+        border-color: #333;
+    }
+    textarea { height: 240px; resize: vertical; }
+</style>
+
+<h1>New Post</h1>
+<form method="POST">
+    <div class="form-group">
+        <label for="title">Title</label>
+        <input type="text" id="title" name="title" required>
+    </div>
+    <div class="form-group">
+        <label for="body">Body</label>
+        <textarea id="body" name="body" required></textarea>
+    </div>
+    <button class="btn btn-primary" type="submit">Publish</button>
+    <a href="{{ url_for('index') }}" style="margin-left:1rem; font-family:sans-serif; font-size:0.875rem; color:#888; text-decoration:none;">Cancel</a>
+</form>
+{% endblock %}

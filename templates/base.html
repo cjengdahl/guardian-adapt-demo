@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Blog{% endblock %}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Georgia, serif; background: #f9f9f9; color: #333; }
+        nav {
+            background: #fff;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        nav a { text-decoration: none; color: #333; }
+        nav .brand { font-size: 1.25rem; font-weight: bold; }
+        nav .new-post {
+            background: #333;
+            color: #fff;
+            padding: 0.4rem 1rem;
+            border-radius: 4px;
+            font-family: sans-serif;
+            font-size: 0.875rem;
+        }
+        .container { max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+        .btn {
+            display: inline-block;
+            padding: 0.5rem 1.25rem;
+            border-radius: 4px;
+            font-family: sans-serif;
+            font-size: 0.875rem;
+            cursor: pointer;
+            text-decoration: none;
+            border: none;
+        }
+        .btn-primary { background: #333; color: #fff; }
+        .btn-danger { background: #c0392b; color: #fff; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a class="brand" href="{{ url_for('index') }}">The Blog</a>
+        <a class="new-post" href="{{ url_for('new_post') }}">+ New Post</a>
+    </nav>
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ post.title }}{% endblock %}
+{% block content %}
+<style>
+    .post-title { font-size: 2rem; margin-bottom: 0.5rem; }
+    .post-meta { font-family: sans-serif; font-size: 0.85rem; color: #888; margin-bottom: 2rem; }
+    .post-body { line-height: 1.8; color: #444; white-space: pre-wrap; }
+    .actions { margin-top: 2.5rem; display: flex; gap: 0.75rem; align-items: center; }
+    .back { font-family: sans-serif; font-size: 0.875rem; color: #888; text-decoration: none; }
+    .back:hover { color: #333; }
+</style>
+
+<h1 class="post-title">{{ post.title }}</h1>
+<div class="post-meta">{{ post.created_at.strftime("%B %d, %Y") }}</div>
+<div class="post-body">{{ post.body }}</div>
+
+<div class="actions">
+    <a class="back" href="{{ url_for('index') }}">← Back</a>
+    <form method="POST" action="{{ url_for('delete_post', post_id=post.id) }}" style="margin:0">
+        <button class="btn btn-danger" onclick="return confirm('Delete this post?')">Delete</button>
+    </form>
+</div>
+{% endblock %}
