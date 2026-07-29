@@ -1,4 +1,4 @@
-name: Security Scan with Guardian - Snyk
+name: Security Scan with Aspen - Snyk
 
 on:
   pull_request:
@@ -32,7 +32,7 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
       - name: Process with Aspen
-        uses: SecurityJourney/aspen-connector@v0.1.2
+        uses: SecurityJourney/aspen-connector@trunk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
