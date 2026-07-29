@@ -38,7 +38,5 @@ jobs:
         with:
           api_domain: my.securityjourney.dev
           scan_results_path: snyk-code-results.json
-          instruction_file_path: .claude/CLAUDE.md
           scanner_type: snyk
           api_token: ${{ secrets.GUARDIAN_API_TOKEN }}
-          auto_commit: true
