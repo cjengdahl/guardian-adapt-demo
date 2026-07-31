@@ -1,17 +1,16 @@
-name: Security Scan with Aspen - Snyk
+name: Aspen Gate Check
 
 on:
   pull_request:
     types: [opened, synchronize]
     branches:
-      - main
+      - main_alt
 
 permissions:
-  contents: write
   pull-requests: write
 
 jobs:
-  security-scan:
+  gate-check:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,21 +21,15 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
-      - name: Setup Snyk
-        uses: snyk/actions/setup@master
-
-      - name: Run Snyk code test
-        run: |
-          snyk code test --sarif > snyk-code-results.json || true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-
-      - name: Process with Aspen
-        uses: SecurityJourney/aspen-connector@trunk
+      - name: Aspen gate check
+        uses: SecurityJourney/aspen-connector@gate-mode
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           api_domain: my.securityjourney.dev
-          scan_results_path: snyk-code-results.json
-          scanner_type: snyk
           api_token: ${{ secrets.GUARDIAN_API_TOKEN }}
+          enforce_gate: 'true'
+          # Optional overrides, uncomment if needed:
+          # gate_status_path: /integrations/learner-compliance/status
+          # gate_fail_open: 'false'
+          # gate_comment_on_failure: 'true'
