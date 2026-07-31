@@ -26,7 +26,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          api_domain: my.securityjourney.dev
+          api_domain: api.securityjourney.dev
           api_token: ${{ secrets.GUARDIAN_API_TOKEN }}
           enforce_gate: 'true'
           # Optional overrides, uncomment if needed:
