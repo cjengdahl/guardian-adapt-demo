@@ -26,6 +26,11 @@ jobs:
 
       - name: Configure mode from branch name
         run: |
+          # Default API domain for Guardian modes (A/B) and Mode D - only
+          # Mode C (raw API key, no JWT/domain derivation) needs a different
+          # host, set below in its own case.
+          echo "ASPEN_API_DOMAIN=my.securityjourney.dev" >> "$GITHUB_ENV"
+
           case "${{ github.ref_name }}" in
             regression/mode-a-full)
               echo "needs_scan=true" >> "$GITHUB_ENV"
@@ -71,6 +76,10 @@ jobs:
               echo "needs_scan=false" >> "$GITHUB_ENV"
               echo 'ASPEN_CWES=["CWE-89","CWE-798"]' >> "$GITHUB_ENV"
               echo "expect_commit=false" >> "$GITHUB_ENV"
+              # adapt.js hits {api_domain}/integrations/cwes directly (raw API
+              # key, no JWT/domain derivation) - api.securityjourney.dev is the
+              # correct host for this path, unlike the Guardian modes below.
+              echo "ASPEN_API_DOMAIN=api.securityjourney.dev" >> "$GITHUB_ENV"
               ;;
             regression/mode-d)
               echo "needs_scan=true" >> "$GITHUB_ENV"
@@ -107,7 +116,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          api_domain: my.securityjourney.dev
+          api_domain: ${{ env.ASPEN_API_DOMAIN }}
           api_token: ${{ secrets.GUARDIAN_API_TOKEN }}
           scan_results_path: ${{ env.ASPEN_SCAN_RESULTS_PATH }}
           instruction_file_path: ${{ env.ASPEN_INSTRUCTION_FILE_PATH }}
