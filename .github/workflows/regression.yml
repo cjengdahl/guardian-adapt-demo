@@ -168,8 +168,11 @@ jobs:
               echo "Expected no commit-back but HEAD changed" >&2
               exit 1
             fi
-            if [ "$expect_dirty_ok" != "true" ] && [ -n "$(git status --porcelain)" ]; then
-              echo "Expected a clean working tree but found uncommitted changes" >&2
+            # Only tracked-file changes count here - scan-based modes (mode-d)
+            # legitimately leave an untracked snyk-code-results.json scratch
+            # file behind, which isn't a connector side effect.
+            if [ "$expect_dirty_ok" != "true" ] && ! git diff --quiet; then
+              echo "Expected a clean working tree but found uncommitted changes to tracked files" >&2
               exit 1
             fi
             echo "No unexpected commit-back — correct"
