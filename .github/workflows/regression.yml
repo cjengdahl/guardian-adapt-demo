@@ -48,6 +48,9 @@ jobs:
               echo "ASPEN_INSTRUCTION_FILE_PATH=.claude/CLAUDE.md" >> "$GITHUB_ENV"
               echo "ASPEN_AUTO_COMMIT=false" >> "$GITHUB_ENV"
               echo "expect_commit=false" >> "$GITHUB_ENV"
+              # auto_commit:false still writes the file locally, just skips
+              # the git commit/push - so the tree is expected to be dirty here.
+              echo "expect_dirty_ok=true" >> "$GITHUB_ENV"
               ;;
             regression/mode-b-full)
               echo "needs_scan=false" >> "$GITHUB_ENV"
@@ -157,7 +160,7 @@ jobs:
               echo "Expected no commit-back but HEAD changed" >&2
               exit 1
             fi
-            if [ -n "$(git status --porcelain)" ]; then
+            if [ "$expect_dirty_ok" != "true" ] && [ -n "$(git status --porcelain)" ]; then
               echo "Expected a clean working tree but found uncommitted changes" >&2
               exit 1
             fi
