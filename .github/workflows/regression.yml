@@ -1,0 +1,165 @@
+name: Aspen Connector Regression
+
+# Each regression/* branch represents one mode of aspen-connector. Pushing
+# (or resetting + force-pushing) a branch retriggers just that mode's job —
+# push a batch of them to run the whole matrix. GitHub reads this file from
+# the pushed branch's own tree, so it must exist identically on every
+# regression/* branch, not just main.
+
+on:
+  push:
+    branches:
+      - 'regression/**'
+
+permissions:
+  contents: write
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure mode from branch name
+        run: |
+          case "${{ github.ref_name }}" in
+            regression/mode-a-full)
+              echo "needs_scan=true" >> "$GITHUB_ENV"
+              echo "ASPEN_SCAN_RESULTS_PATH=snyk-code-results.json" >> "$GITHUB_ENV"
+              echo "ASPEN_INSTRUCTION_FILE_PATH=.claude/CLAUDE.md" >> "$GITHUB_ENV"
+              echo "ASPEN_AUTO_COMMIT=true" >> "$GITHUB_ENV"
+              echo "expect_commit=true" >> "$GITHUB_ENV"
+              ;;
+            regression/mode-a-guardian-only)
+              echo "needs_scan=true" >> "$GITHUB_ENV"
+              echo "ASPEN_SCAN_RESULTS_PATH=snyk-code-results.json" >> "$GITHUB_ENV"
+              echo "ASPEN_INSTRUCTION_FILE_PATH=.claude/CLAUDE.md" >> "$GITHUB_ENV"
+              echo "ASPEN_AUTO_COMMIT=true" >> "$GITHUB_ENV"
+              echo "ASPEN_EXCLUDE_GIT_METADATA_FIELDS=all" >> "$GITHUB_ENV"
+              echo "expect_commit=true" >> "$GITHUB_ENV"
+              ;;
+            regression/mode-a-no-commit)
+              echo "needs_scan=true" >> "$GITHUB_ENV"
+              echo "ASPEN_SCAN_RESULTS_PATH=snyk-code-results.json" >> "$GITHUB_ENV"
+              echo "ASPEN_INSTRUCTION_FILE_PATH=.claude/CLAUDE.md" >> "$GITHUB_ENV"
+              echo "ASPEN_AUTO_COMMIT=false" >> "$GITHUB_ENV"
+              echo "expect_commit=false" >> "$GITHUB_ENV"
+              ;;
+            regression/mode-b-full)
+              echo "needs_scan=false" >> "$GITHUB_ENV"
+              echo 'ASPEN_CWES=["CWE-89","CWE-798"]' >> "$GITHUB_ENV"
+              echo "ASPEN_INSTRUCTION_FILE_PATH=.claude/CLAUDE.md" >> "$GITHUB_ENV"
+              echo "ASPEN_AUTO_COMMIT=true" >> "$GITHUB_ENV"
+              echo "expect_commit=true" >> "$GITHUB_ENV"
+              ;;
+            regression/mode-b-guardian-only)
+              echo "needs_scan=false" >> "$GITHUB_ENV"
+              echo 'ASPEN_CWES=["CWE-89","CWE-798"]' >> "$GITHUB_ENV"
+              echo "ASPEN_INSTRUCTION_FILE_PATH=.claude/CLAUDE.md" >> "$GITHUB_ENV"
+              echo "ASPEN_AUTO_COMMIT=true" >> "$GITHUB_ENV"
+              echo "ASPEN_EXCLUDE_GIT_METADATA_FIELDS=all" >> "$GITHUB_ENV"
+              echo "expect_commit=true" >> "$GITHUB_ENV"
+              ;;
+            regression/mode-c)
+              echo "needs_scan=false" >> "$GITHUB_ENV"
+              echo 'ASPEN_CWES=["CWE-89","CWE-798"]' >> "$GITHUB_ENV"
+              echo "expect_commit=false" >> "$GITHUB_ENV"
+              ;;
+            regression/mode-d)
+              echo "needs_scan=true" >> "$GITHUB_ENV"
+              echo "ASPEN_SCAN_RESULTS_PATH=snyk-code-results.json" >> "$GITHUB_ENV"
+              echo "expect_commit=false" >> "$GITHUB_ENV"
+              ;;
+            regression/gate-noncompliant)
+              echo "needs_scan=false" >> "$GITHUB_ENV"
+              echo "is_gate=true" >> "$GITHUB_ENV"
+              echo "expect_commit=false" >> "$GITHUB_ENV"
+              ;;
+            *)
+              echo "Unknown regression branch: ${{ github.ref_name }}" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Record pre-run HEAD
+        run: echo "before_sha=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Setup Snyk
+        if: env.needs_scan == 'true'
+        uses: snyk/actions/setup@master
+
+      - name: Run Snyk code test
+        if: env.needs_scan == 'true'
+        run: snyk code test --sarif > "$ASPEN_SCAN_RESULTS_PATH" || true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Run Aspen (Guardian/Adapt modes)
+        if: env.is_gate != 'true'
+        uses: SecurityJourney/aspen-connector@v0.1.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          api_domain: my.securityjourney.dev
+          api_token: ${{ secrets.GUARDIAN_API_TOKEN }}
+          scan_results_path: ${{ env.ASPEN_SCAN_RESULTS_PATH }}
+          instruction_file_path: ${{ env.ASPEN_INSTRUCTION_FILE_PATH }}
+          cwes: ${{ env.ASPEN_CWES }}
+          auto_commit: ${{ env.ASPEN_AUTO_COMMIT }}
+          exclude_git_metadata_fields: ${{ env.ASPEN_EXCLUDE_GIT_METADATA_FIELDS || '[]' }}
+
+      # Gate mode isn't published to npm/the v0.1.2 tag yet — installed from
+      # the connector's gate-mode branch directly, same as main_alt's
+      # aspen-gate-check.yml. `continue-on-error` because this run is
+      # *expected* to fail (the fixture learner is deliberately non-compliant)
+      # — the real assertion is in the next step, not this one's own outcome.
+      - name: Run Aspen (gate check)
+        if: env.is_gate == 'true'
+        id: aspen_gate
+        continue-on-error: true
+        uses: SecurityJourney/aspen-connector@gate-mode
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          api_domain: api.securityjourney.dev
+          api_token: ${{ secrets.GUARDIAN_API_TOKEN }}
+          enforce_gate: 'true'
+
+      - name: Assert gate blocked as expected
+        if: env.is_gate == 'true'
+        run: |
+          if [ "${{ steps.aspen_gate.outcome }}" != "failure" ]; then
+            echo "Expected the gate to block this known non-compliant learner, but it didn't (outcome: ${{ steps.aspen_gate.outcome }})" >&2
+            exit 1
+          fi
+          echo "Gate correctly blocked the non-compliant learner"
+
+      - name: Assert commit-back happened / didn't
+        if: env.is_gate != 'true'
+        run: |
+          after_sha=$(git rev-parse HEAD)
+          if [ "$expect_commit" = "true" ]; then
+            if [ "$after_sha" = "$before_sha" ]; then
+              echo "Expected a commit-back but HEAD didn't change" >&2
+              exit 1
+            fi
+            if git diff --quiet "$before_sha" "$after_sha" -- "$ASPEN_INSTRUCTION_FILE_PATH"; then
+              echo "Expected the instruction file to change but it didn't" >&2
+              exit 1
+            fi
+            echo "Commit-back happened and instruction file changed — correct"
+          else
+            if [ "$after_sha" != "$before_sha" ]; then
+              echo "Expected no commit-back but HEAD changed" >&2
+              exit 1
+            fi
+            if [ -n "$(git status --porcelain)" ]; then
+              echo "Expected a clean working tree but found uncommitted changes" >&2
+              exit 1
+            fi
+            echo "No unexpected commit-back — correct"
+          fi
