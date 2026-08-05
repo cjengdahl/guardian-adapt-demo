@@ -3,20 +3,21 @@
 # triggers a fresh regression.yml run for each of the 8 modes.
 #
 # Usage:
-#   scripts/run-regression.sh [compliant_email]
+#   scripts/run-regression.sh [compliant_email] [noncompliant_email]
 #
-# The gate's non-compliant and not-found fixtures use known-good defaults
-# (see set-gate-fixture.sh). The compliant fixture needs a real learner
-# whose required training is complete - pass its email as the one argument
-# here, or set COMPLIANT_EMAIL. If neither is given, gate-compliant is
-# skipped rather than run against a placeholder.
+# compliant/noncompliant need real learners in the tenant (training
+# complete/incomplete respectively) - pass their emails positionally, or set
+# COMPLIANT_EMAIL/NONCOMPLIANT_EMAIL. Neither has a default; whichever one
+# is missing gets skipped rather than run against a placeholder. The
+# not-found fixture has a known-good default (see set-gate-fixture.sh) and
+# always runs.
 
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
 compliant_email="${1:-${COMPLIANT_EMAIL:-}}"
-noncompliant_email="${NONCOMPLIANT_EMAIL:-cory_engdahl@securityjourney.com}"
+noncompliant_email="${2:-${NONCOMPLIANT_EMAIL:-}}"
 
 mode_branches=(
   mode-a-full
@@ -40,13 +41,18 @@ git push origin -f "${mode_branches[@]/#/regression/}"
 
 echo
 echo "== Setting gate fixtures =="
-./scripts/set-gate-fixture.sh noncompliant "$noncompliant_email"
 ./scripts/set-gate-fixture.sh notfound
 
 if [[ -n "$compliant_email" ]]; then
   ./scripts/set-gate-fixture.sh compliant "$compliant_email"
 else
   echo "Skipping gate-compliant - no email given (pass as \$1 or set COMPLIANT_EMAIL)"
+fi
+
+if [[ -n "$noncompliant_email" ]]; then
+  ./scripts/set-gate-fixture.sh noncompliant "$noncompliant_email"
+else
+  echo "Skipping gate-noncompliant - no email given (pass as \$2 or set NONCOMPLIANT_EMAIL)"
 fi
 
 echo
