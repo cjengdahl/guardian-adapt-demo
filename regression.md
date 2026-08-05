@@ -16,7 +16,7 @@ itself is committed on this branch too — GitHub resolves `on: push` workflow
 definitions from the *pushed ref's own tree*, not from `main`, so the
 workflow file has to exist on every branch that triggers it.
 
-**Eleven `regression/*` branches**, one per mode/fixture, are just branch
+**Fifteen `regression/*` branches**, one per mode/fixture, are just branch
 pointers at `regression-base`'s tip:
 
 | Branch | Mode | What it exercises |
@@ -32,6 +32,28 @@ pointers at `regression-base`'s tip:
 | `regression/gate-compliant` | E | Gate check against a compliant learner — expected to pass |
 | `regression/gate-noncompliant` | E | Gate check against a non-compliant learner — expected to block |
 | `regression/gate-notfound` | E | Gate check against an unregistered email — expected to fail open (pass, with a warning) |
+| `regression/mode-a-gated` | A+E | Mode A run with `enforce_gate: 'true'` against the non-compliant fixture — gate should block *before* any commit-back |
+| `regression/mode-b-gated` | B+E | Same, for Mode B |
+| `regression/mode-c-gated` | C+E | Same, for Mode C |
+| `regression/mode-d-gated` | D+E | Same, for Mode D |
+
+### Combined mode+gate ("gated") branches
+
+These test the short-circuit behavior described in the connector's own
+`src/index.js`: when `enforce_gate: 'true'` is passed alongside a mode's
+normal inputs in a single call, the gate check runs *first*, and if it
+blocks, the function returns before any mode logic (commit-back, CWE
+recording) ever executes. This is different from just running the gate
+alone (`regression/gate-noncompliant`) — it proves the short-circuit itself,
+not just that the gate works in isolation. Each of these four branches uses
+its mode's "full" configuration plus `enforce_gate: 'true'`, and asserts
+both that the step failed (gate blocked) *and* that no commit-back happened
+— the second assertion is what actually confirms short-circuiting rather
+than the mode simply running after a comment got posted.
+
+They rely on `regression-base`'s tip commit being authored by the known
+non-compliant learner's email (true today, since that's whoever's git
+identity last committed to `regression-base`).
 
 `regression.yml` is triggered by `push` to any `regression/**` branch (has
 to be a real `push` event — the connector's GitHub provider hard-rejects
@@ -74,8 +96,9 @@ git commands so you don't have to remember them.
 ./scripts/run-regression.sh compliant@example.com noncompliant@example.com   # include both
 ```
 
-Resets and pushes all 7 non-gate mode branches from `regression-base`, then
-calls `set-gate-fixture.sh` for all three gate cases. `notfound` always runs
+Resets and pushes all 11 non-gate mode branches from `regression-base`
+(7 plain + 4 combined mode+gate "gated" ones), then calls
+`set-gate-fixture.sh` for all three gate cases. `notfound` always runs
 (defaults to `non-existent-user@securityjourney.com`, override with
 `NOTFOUND_EMAIL=...`). `compliant` and `noncompliant` have no defaults —
 each is skipped (rather than run against a placeholder) unless you pass its
