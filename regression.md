@@ -16,8 +16,8 @@ itself is committed on this branch too — GitHub resolves `on: push` workflow
 definitions from the *pushed ref's own tree*, not from `main`, so the
 workflow file has to exist on every branch that triggers it.
 
-**Eight `regression/*` branches**, one per mode, are just branch pointers at
-`regression-base`'s tip:
+**Ten `regression/*` branches**, one per mode/fixture, are just branch
+pointers at `regression-base`'s tip:
 
 | Branch | Mode | What it exercises |
 | --- | --- | --- |
@@ -28,46 +28,61 @@ workflow file has to exist on every branch that triggers it.
 | `regression/mode-b-guardian-only` | B | Same, CWE recording suppressed |
 | `regression/mode-c` | C | Explicit CWE list → record only, no instruction file, no commit-back |
 | `regression/mode-d` | D | Scan results → extract + record CWEs, no commit-back |
-| `regression/gate-noncompliant` | E | Gate check against a known non-compliant learner — expected to block |
+| `regression/gate-compliant` | E | Gate check against a compliant learner — expected to pass |
+| `regression/gate-noncompliant` | E | Gate check against a non-compliant learner — expected to block |
+| `regression/gate-notfound` | E | Gate check against an unregistered email — expected to fail open (pass, with a warning) |
 
 `regression.yml` is triggered by `push` to any `regression/**` branch (has
 to be a real `push` event — the connector's GitHub provider hard-rejects
 `workflow_dispatch`). A single job configures itself per-branch via a `case`
-on `github.ref_name`, then asserts pass/fail inline (commit-back
-happened/didn't as expected, gate blocked as expected) — no external
-checker. A red job in the GitHub Actions UI *is* the regression signal.
+on `github.ref_name`, then asserts pass/fail inline against each branch's
+`expect_gate_outcome`/`expect_commit` — no external checker. A red job in
+the GitHub Actions UI *is* the regression signal.
 
 **Nothing in the workflow creates these branches.** They're plain local
 `git` branches, created once and pushed like any other branch — see below
 for how to (re)create or reset them.
 
-### Known gap
+### The three gate fixtures
 
-`regression/gate-noncompliant` is the only gate fixture — there's no second,
-compliant-learner branch, so the "gate correctly passes a compliant
-learner" path isn't covered, only "gate correctly blocks a non-compliant
-one." Add a `regression/gate-compliant` branch (same idea, but its last
-commit's author email needs to be a learner who's actually completed the
-required training) if/when a second test learner exists.
+The connector reads the gate's target email via `git log -1 --format=%ae`
+on whatever's checked out — so each gate branch's fixture is just that
+branch's last commit's author email, not anything backend-configured per
+branch:
+
+- **compliant** / **noncompliant** need to be real, registered learners in
+  the tenant (with their required training complete/incomplete,
+  respectively) — you provide the actual email.
+- **notfound** just needs an email that doesn't match any directory entry —
+  `non-existent-user@securityjourney.com` by default, no backend setup
+  needed.
+
+`scripts/set-gate-fixture.sh` sets/resets one of these branches with the
+right author email — see below.
 
 ## Triggering a regression run
 
 Pushing (or force-pushing) a `regression/*` branch is what runs its mode —
-there's no separate "run" command beyond git push.
+there's no separate "run" command beyond git push. Two scripts wrap the
+git commands so you don't have to remember them.
 
-**Re-run the whole suite** (reset every branch back to a clean
-`regression-base` and re-trigger all eight):
+**Run everything at once:**
 
 ```bash
-git checkout regression-base
-for b in mode-a-full mode-a-guardian-only mode-a-no-commit mode-b-full mode-b-guardian-only mode-c mode-d gate-noncompliant; do
-  git branch -f "regression/$b" regression-base
-done
-git push origin -f $(for b in mode-a-full mode-a-guardian-only mode-a-no-commit mode-b-full mode-b-guardian-only mode-c mode-d gate-noncompliant; do echo "regression/$b"; done)
+./scripts/run-regression.sh                                    # skips gate-compliant, no email known
+./scripts/run-regression.sh cory_engdahl@securityjourney.com    # include gate-compliant
 ```
 
-**Re-run just one mode** (e.g. after changing `regression.yml` and wanting
-to retest only `mode-c`):
+Resets and pushes all 7 non-gate mode branches from `regression-base`, then
+calls `set-gate-fixture.sh` for all three gate cases. `noncompliant`
+defaults to `cory_engdahl@securityjourney.com`, `notfound` defaults to
+`non-existent-user@securityjourney.com`; override either with
+`NONCOMPLIANT_EMAIL=... NOTFOUND_EMAIL=...`. `compliant` is skipped (rather
+than run against a placeholder) unless you pass its email as `$1` or set
+`COMPLIANT_EMAIL`.
+
+**Re-run just one non-gate mode** (e.g. after changing `regression.yml` and
+wanting to retest only `mode-c`):
 
 ```bash
 git checkout regression-base
@@ -75,10 +90,18 @@ git branch -f regression/mode-c regression-base
 git push origin -f regression/mode-c
 ```
 
+**Re-run just one gate fixture:**
+
+```bash
+./scripts/set-gate-fixture.sh compliant    cory_engdahl@securityjourney.com
+./scripts/set-gate-fixture.sh noncompliant cory_engdahl@securityjourney.com
+./scripts/set-gate-fixture.sh notfound     # or: notfound some-other@email.com
+```
+
 **Watch results:**
 
 ```bash
-gh run list -R cjengdahl/guardian-adapt-demo --workflow=regression.yml -L 8
+gh run list -R cjengdahl/guardian-adapt-demo --workflow=regression.yml -L 10
 gh run watch <run-id> -R cjengdahl/guardian-adapt-demo
 ```
 
@@ -88,9 +111,8 @@ Or just check the Actions tab in the GitHub UI, filtered to the
 ### If you change `regression.yml` or the base fixtures
 
 Edit the files on `regression-base`, commit, push `regression-base` itself,
-then re-point and re-push whichever `regression/*` branches you want to
-retest (same commands as above) — they won't pick up the change until
-they're reset to the new `regression-base` tip.
+then re-run `run-regression.sh` (or reset individual branches) — they won't
+pick up the change until they're reset to the new `regression-base` tip.
 
 ### Why force-reset instead of just re-pushing more commits?
 
@@ -98,4 +120,5 @@ Commit-back modes (A/B) push a real commit onto their branch every run. If
 you don't reset first, each re-run starts from wherever the *previous* run
 left the instruction file, rather than from the same clean vulnerable-code
 baseline — making runs non-deterministic and hard to compare. Resetting to
-`regression-base` before every push keeps each run identical to the last.
+`regression-base` before every push (which is all both scripts do) keeps
+each run identical to the last.
