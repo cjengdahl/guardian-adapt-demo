@@ -1,4 +1,5 @@
 name: Aspen Connector Regression
+run-name: "Regression: ${{ github.ref_name }}"
 
 # Each regression/* branch represents one mode of aspen-connector. Pushing
 # (or resetting + force-pushing) a branch retriggers just that mode's job —
