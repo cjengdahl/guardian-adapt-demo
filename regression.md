@@ -105,6 +105,11 @@ gh run list -R cjengdahl/guardian-adapt-demo --workflow=regression.yml -L 10
 gh run watch <run-id> -R cjengdahl/guardian-adapt-demo
 ```
 
+Each run's title is set via `run-name: "Regression: ${{ github.ref_name }}"`
+in the workflow, so both the Actions UI and `gh run list` show e.g.
+`Regression: regression/mode-a-full` instead of the commit message — makes
+it obvious which mode a given run is testing without opening it.
+
 Or just check the Actions tab in the GitHub UI, filtered to the
 "Aspen Connector Regression" workflow — one run per branch pushed.
 
