@@ -87,6 +87,23 @@ jobs:
               echo "needs_scan=false" >> "$GITHUB_ENV"
               echo "is_gate=true" >> "$GITHUB_ENV"
               echo "expect_commit=false" >> "$GITHUB_ENV"
+              echo "expect_gate_outcome=failure" >> "$GITHUB_ENV"
+              ;;
+            regression/gate-compliant)
+              echo "needs_scan=false" >> "$GITHUB_ENV"
+              echo "is_gate=true" >> "$GITHUB_ENV"
+              echo "expect_commit=false" >> "$GITHUB_ENV"
+              echo "expect_gate_outcome=success" >> "$GITHUB_ENV"
+              ;;
+            regression/gate-notfound)
+              echo "needs_scan=false" >> "$GITHUB_ENV"
+              echo "is_gate=true" >> "$GITHUB_ENV"
+              echo "expect_commit=false" >> "$GITHUB_ENV"
+              # Unknown email -> per-result error -> fail-open (allowed) by
+              # default (ASPEN_GATE_FAIL_OPEN defaults to true), so this
+              # should pass just like the compliant case, for a different
+              # reason - see the job log for which path it actually took.
+              echo "expect_gate_outcome=success" >> "$GITHUB_ENV"
               ;;
             *)
               echo "Unknown regression branch: ${{ github.ref_name }}" >&2
@@ -125,9 +142,9 @@ jobs:
 
       # Gate mode isn't published to npm/the v0.1.2 tag yet — installed from
       # the connector's gate-mode branch directly, same as main_alt's
-      # aspen-gate-check.yml. `continue-on-error` because this run is
-      # *expected* to fail (the fixture learner is deliberately non-compliant)
-      # — the real assertion is in the next step, not this one's own outcome.
+      # aspen-gate-check.yml. `continue-on-error` because the non-compliant
+      # fixture is *expected* to fail this step — the real assertion (against
+      # expect_gate_outcome) is in the next step, not this one's own outcome.
       - name: Run Aspen (gate check)
         if: env.is_gate == 'true'
         id: aspen_gate
@@ -140,14 +157,14 @@ jobs:
           api_token: ${{ secrets.GUARDIAN_API_TOKEN }}
           enforce_gate: 'true'
 
-      - name: Assert gate blocked as expected
+      - name: Assert gate outcome
         if: env.is_gate == 'true'
         run: |
-          if [ "${{ steps.aspen_gate.outcome }}" != "failure" ]; then
-            echo "Expected the gate to block this known non-compliant learner, but it didn't (outcome: ${{ steps.aspen_gate.outcome }})" >&2
+          if [ "${{ steps.aspen_gate.outcome }}" != "$expect_gate_outcome" ]; then
+            echo "Expected gate outcome '$expect_gate_outcome' but got '${{ steps.aspen_gate.outcome }}'" >&2
             exit 1
           fi
-          echo "Gate correctly blocked the non-compliant learner"
+          echo "Gate outcome matched expectation ($expect_gate_outcome)"
 
       - name: Assert commit-back happened / didn't
         if: env.is_gate != 'true'
