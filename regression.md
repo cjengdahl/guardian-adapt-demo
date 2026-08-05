@@ -69,17 +69,16 @@ git commands so you don't have to remember them.
 **Run everything at once:**
 
 ```bash
-./scripts/run-regression.sh                                    # skips gate-compliant, no email known
-./scripts/run-regression.sh cory_engdahl@securityjourney.com    # include gate-compliant
+./scripts/run-regression.sh                                                                    # skips gate-compliant and gate-noncompliant, no emails known
+./scripts/run-regression.sh compliant@example.com noncompliant@example.com   # include both
 ```
 
 Resets and pushes all 7 non-gate mode branches from `regression-base`, then
-calls `set-gate-fixture.sh` for all three gate cases. `noncompliant`
-defaults to `cory_engdahl@securityjourney.com`, `notfound` defaults to
-`non-existent-user@securityjourney.com`; override either with
-`NONCOMPLIANT_EMAIL=... NOTFOUND_EMAIL=...`. `compliant` is skipped (rather
-than run against a placeholder) unless you pass its email as `$1` or set
-`COMPLIANT_EMAIL`.
+calls `set-gate-fixture.sh` for all three gate cases. `notfound` always runs
+(defaults to `non-existent-user@securityjourney.com`, override with
+`NOTFOUND_EMAIL=...`). `compliant` and `noncompliant` have no defaults —
+each is skipped (rather than run against a placeholder) unless you pass its
+email positionally (`$1`/`$2`) or set `COMPLIANT_EMAIL`/`NONCOMPLIANT_EMAIL`.
 
 **Re-run just one non-gate mode** (e.g. after changing `regression.yml` and
 wanting to retest only `mode-c`):
