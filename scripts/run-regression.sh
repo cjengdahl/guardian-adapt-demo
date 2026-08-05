@@ -25,6 +25,7 @@ mode_branches=(
   mode-a-no-commit
   mode-b-full
   mode-b-guardian-only
+  mode-b-no-commit
   mode-c
   mode-d
 )
