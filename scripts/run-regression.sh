@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Resets and pushes every regression/* branch from regression-base, which
-# triggers a fresh regression.yml run for each of the 8 modes.
+# triggers a fresh regression.yml run for each of the 12 modes.
 #
 # Usage:
 #   scripts/run-regression.sh [compliant_email] [noncompliant_email]
@@ -13,10 +13,12 @@
 # always runs.
 #
 # The four mode-*-gated branches (combined mode + gate check, expecting the
-# gate to short-circuit before the mode runs) rely on regression-base's tip
-# commit being authored by the known non-compliant learner's email - true
-# today since that's whoever's git identity last committed to
-# regression-base. If that ever changes, these branches need re-checking.
+# gate to short-circuit before the mode runs) rely on the HEAD commit being
+# authored by the known non-compliant learner's email. The mode loop below
+# preserves regression-base's tip author when it adds its trigger commit, so
+# this holds as long as regression-base's own tip stays authored by that
+# learner - true today since that's whoever's git identity last committed to
+# it. If that ever changes, these branches need re-checking.
 
 set -euo pipefail
 
@@ -42,12 +44,31 @@ mode_branches=(
 
 echo "== Resetting mode branches from regression-base =="
 git fetch origin --quiet
+
+# The non-commit-back modes (mode-*-no-commit, mode-c, mode-d, and every
+# mode-*-gated) leave their branch sitting exactly at regression-base's tip,
+# so a plain reset + force-push to that same SHA is a no-op that fires no
+# workflow. Put a fresh empty commit on each branch (unique per branch and per
+# run) so the ref SHA always changes and the push reliably triggers a run.
+#
+# The gate check reads the committer's email from the HEAD commit's author
+# (git log --format=%ae), so reuse regression-base's tip author here - that's
+# the known non-compliant learner the mode-*-gated branches expect to be
+# blocked on. A stock empty commit would reattribute HEAD to whoever runs
+# this script and quietly change what those branches actually test.
+base_author=$(git log -1 --format='%an <%ae>' origin/regression-base)
+run_stamp=$(date -u +%Y%m%dT%H%M%SZ)
+
 # Can't force-update a branch you're currently on, so make sure we're not
 # sitting on one of the branches this loop is about to reset.
 git checkout regression-base --quiet
 for b in "${mode_branches[@]}"; do
   git branch -f "regression/$b" origin/regression-base
+  git checkout "regression/$b" --quiet
+  git commit --allow-empty --author="$base_author" \
+    -m "regression trigger: $b @ $run_stamp" --quiet
 done
+git checkout regression-base --quiet
 git push origin -f "${mode_branches[@]/#/regression/}"
 
 echo
