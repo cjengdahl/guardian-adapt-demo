@@ -11,6 +11,12 @@
 # is missing gets skipped rather than run against a placeholder. The
 # not-found fixture has a known-good default (see set-gate-fixture.sh) and
 # always runs.
+#
+# The four mode-*-gated branches (combined mode + gate check, expecting the
+# gate to short-circuit before the mode runs) rely on regression-base's tip
+# commit being authored by the known non-compliant learner's email - true
+# today since that's whoever's git identity last committed to
+# regression-base. If that ever changes, these branches need re-checking.
 
 set -euo pipefail
 
@@ -28,6 +34,10 @@ mode_branches=(
   mode-b-no-commit
   mode-c
   mode-d
+  mode-a-gated
+  mode-b-gated
+  mode-c-gated
+  mode-d-gated
 )
 
 echo "== Resetting mode branches from regression-base =="

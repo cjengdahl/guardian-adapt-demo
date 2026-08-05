@@ -94,6 +94,34 @@ jobs:
               echo "ASPEN_SCAN_RESULTS_PATH=snyk-code-results.json" >> "$GITHUB_ENV"
               echo "expect_commit=false" >> "$GITHUB_ENV"
               ;;
+            regression/mode-a-gated)
+              echo "needs_scan=true" >> "$GITHUB_ENV"
+              echo "ASPEN_SCAN_RESULTS_PATH=snyk-code-results.json" >> "$GITHUB_ENV"
+              echo "ASPEN_INSTRUCTION_FILE_PATH=.claude/CLAUDE.md" >> "$GITHUB_ENV"
+              echo "ASPEN_AUTO_COMMIT=true" >> "$GITHUB_ENV"
+              echo "expect_commit=false" >> "$GITHUB_ENV"
+              echo "is_gated_mode=true" >> "$GITHUB_ENV"
+              ;;
+            regression/mode-b-gated)
+              echo "needs_scan=false" >> "$GITHUB_ENV"
+              echo 'ASPEN_CWES=["CWE-89","CWE-798"]' >> "$GITHUB_ENV"
+              echo "ASPEN_INSTRUCTION_FILE_PATH=.claude/CLAUDE.md" >> "$GITHUB_ENV"
+              echo "ASPEN_AUTO_COMMIT=true" >> "$GITHUB_ENV"
+              echo "expect_commit=false" >> "$GITHUB_ENV"
+              echo "is_gated_mode=true" >> "$GITHUB_ENV"
+              ;;
+            regression/mode-c-gated)
+              echo "needs_scan=false" >> "$GITHUB_ENV"
+              echo 'ASPEN_CWES=["CWE-89","CWE-798"]' >> "$GITHUB_ENV"
+              echo "expect_commit=false" >> "$GITHUB_ENV"
+              echo "is_gated_mode=true" >> "$GITHUB_ENV"
+              ;;
+            regression/mode-d-gated)
+              echo "needs_scan=true" >> "$GITHUB_ENV"
+              echo "ASPEN_SCAN_RESULTS_PATH=snyk-code-results.json" >> "$GITHUB_ENV"
+              echo "expect_commit=false" >> "$GITHUB_ENV"
+              echo "is_gated_mode=true" >> "$GITHUB_ENV"
+              ;;
             regression/gate-noncompliant)
               echo "needs_scan=false" >> "$GITHUB_ENV"
               echo "is_gate=true" >> "$GITHUB_ENV"
@@ -136,7 +164,7 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
       - name: Run Aspen (Guardian/Adapt modes)
-        if: env.is_gate != 'true'
+        if: env.is_gate != 'true' && env.is_gated_mode != 'true'
         # Mode C/D endpoint fixes only landed on gate-mode, not yet the
         # published v0.1.2 tag - use gate-mode here too until that ships.
         uses: SecurityJourney/aspen-connector@gate-mode
@@ -150,6 +178,37 @@ jobs:
           cwes: ${{ env.ASPEN_CWES }}
           auto_commit: ${{ env.ASPEN_AUTO_COMMIT }}
           exclude_git_metadata_fields: ${{ env.ASPEN_EXCLUDE_GIT_METADATA_FIELDS || '[]' }}
+
+      # Combined mode+gate branches: the gate runs first (inside the
+      # connector itself) against the known non-compliant fixture, and is
+      # expected to block *before* any mode logic (commit-back, CWE
+      # recording) ever runs - proving the short-circuit described in
+      # src/index.js, not just the gate-alone behavior. continue-on-error
+      # because blocking is the expected, correct outcome here.
+      - name: Run Aspen (mode + gate, expect short-circuit)
+        if: env.is_gated_mode == 'true'
+        id: aspen_gated
+        continue-on-error: true
+        uses: SecurityJourney/aspen-connector@gate-mode
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          api_domain: ${{ env.ASPEN_API_DOMAIN }}
+          api_token: ${{ secrets.GUARDIAN_API_TOKEN }}
+          scan_results_path: ${{ env.ASPEN_SCAN_RESULTS_PATH }}
+          instruction_file_path: ${{ env.ASPEN_INSTRUCTION_FILE_PATH }}
+          cwes: ${{ env.ASPEN_CWES }}
+          auto_commit: ${{ env.ASPEN_AUTO_COMMIT }}
+          enforce_gate: 'true'
+
+      - name: Assert gate short-circuited the mode
+        if: env.is_gated_mode == 'true'
+        run: |
+          if [ "${{ steps.aspen_gated.outcome }}" != "failure" ]; then
+            echo "Expected the gate to block before mode processing ran, but outcome was '${{ steps.aspen_gated.outcome }}'" >&2
+            exit 1
+          fi
+          echo "Gate correctly blocked before this mode's processing ran"
 
       # Gate mode isn't published to npm/the v0.1.2 tag yet — installed from
       # the connector's gate-mode branch directly, same as main_alt's
