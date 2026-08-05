@@ -16,7 +16,7 @@ itself is committed on this branch too — GitHub resolves `on: push` workflow
 definitions from the *pushed ref's own tree*, not from `main`, so the
 workflow file has to exist on every branch that triggers it.
 
-**Ten `regression/*` branches**, one per mode/fixture, are just branch
+**Eleven `regression/*` branches**, one per mode/fixture, are just branch
 pointers at `regression-base`'s tip:
 
 | Branch | Mode | What it exercises |
@@ -26,6 +26,7 @@ pointers at `regression-base`'s tip:
 | `regression/mode-a-no-commit` | A | Same, but `auto_commit: false` — writes the file locally, doesn't commit |
 | `regression/mode-b-full` | B | Explicit CWE list → rewrite instructions, commit back |
 | `regression/mode-b-guardian-only` | B | Same, CWE recording suppressed |
+| `regression/mode-b-no-commit` | B | Same, but `auto_commit: false` — writes the file locally, doesn't commit |
 | `regression/mode-c` | C | Explicit CWE list → record only, no instruction file, no commit-back |
 | `regression/mode-d` | D | Scan results → extract + record CWEs, no commit-back |
 | `regression/gate-compliant` | E | Gate check against a compliant learner — expected to pass |
