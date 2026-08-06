@@ -13,12 +13,9 @@
 # always runs.
 #
 # The four mode-*-gated branches (combined mode + gate check, expecting the
-# gate to short-circuit before the mode runs) rely on the HEAD commit being
-# authored by the known non-compliant learner's email. The mode loop below
-# preserves regression-base's tip author when it adds its trigger commit, so
-# this holds as long as regression-base's own tip stays authored by that
-# learner - true today since that's whoever's git identity last committed to
-# it. If that ever changes, these branches need re-checking.
+# gate to short-circuit before the mode runs) need their trigger commit
+# authored by the non-compliant learner's email, so they're skipped rather
+# than run against a placeholder if noncompliant_email isn't given.
 
 set -euo pipefail
 
@@ -41,6 +38,15 @@ mode_branches=(
   mode-c-gated
   mode-d-gated
 )
+gated_branches=(mode-a-gated mode-b-gated mode-c-gated mode-d-gated)
+
+is_gated_branch() {
+  local candidate="$1"
+  for g in "${gated_branches[@]}"; do
+    [[ "$candidate" == "$g" ]] && return 0
+  done
+  return 1
+}
 
 echo "== Resetting mode branches from regression-base =="
 git fetch origin --quiet
@@ -52,24 +58,38 @@ git fetch origin --quiet
 # run) so the ref SHA always changes and the push reliably triggers a run.
 #
 # The gate check reads the committer's email from the HEAD commit's author
-# (git log --format=%ae), so reuse regression-base's tip author here - that's
-# the known non-compliant learner the mode-*-gated branches expect to be
-# blocked on. A stock empty commit would reattribute HEAD to whoever runs
-# this script and quietly change what those branches actually test.
+# (git log --format=%ae), so mode-*-gated branches get their trigger commit
+# authored as the known non-compliant learner - that's what they expect to be
+# blocked on. Every other branch just reuses regression-base's tip author; a
+# stock empty commit would reattribute HEAD to whoever runs this script and
+# quietly change what those branches actually test.
 base_author=$(git log -1 --format='%an <%ae>' origin/regression-base)
 run_stamp=$(date -u +%Y%m%dT%H%M%SZ)
 
 # Can't force-update a branch you're currently on, so make sure we're not
 # sitting on one of the branches this loop is about to reset.
 git checkout regression-base --quiet
+pushed_branches=()
 for b in "${mode_branches[@]}"; do
+  if is_gated_branch "$b"; then
+    if [[ -z "$noncompliant_email" ]]; then
+      echo "Skipping regression/$b - gated branches require a non-compliant learner email (pass as \$2 or set NONCOMPLIANT_EMAIL)"
+      continue
+    fi
+    author="Aspen Gate Fixture <$noncompliant_email>"
+  else
+    author="$base_author"
+  fi
   git branch -f "regression/$b" origin/regression-base
   git checkout "regression/$b" --quiet
-  git commit --allow-empty --author="$base_author" \
+  git commit --allow-empty --author="$author" \
     -m "regression trigger: $b @ $run_stamp" --quiet
+  pushed_branches+=("$b")
 done
 git checkout regression-base --quiet
-git push origin -f "${mode_branches[@]/#/regression/}"
+if [[ "${#pushed_branches[@]}" -gt 0 ]]; then
+  git push origin -f "${pushed_branches[@]/#/regression/}"
+fi
 
 echo
 echo "== Setting gate fixtures =="
