@@ -22,7 +22,9 @@ jobs:
           fetch-depth: 0
 
       - name: Aspen gate check
-        uses: SecurityJourney/aspen-connector@gate-mode
+        # Gate mode (#17) merged to trunk but hasn't been tagged/published
+        # yet - track trunk directly until a new version ships.
+        uses: SecurityJourney/aspen-connector@trunk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
