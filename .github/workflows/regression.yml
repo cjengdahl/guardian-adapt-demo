@@ -28,9 +28,9 @@ jobs:
       - name: Configure mode from branch name
         run: |
           # One api_domain works for every mode as of aspen-connector's
-          # gate-mode branch fix: Guardian (A/B) and Extract (D) derive
-          # api.->my. internally, Adapt (C) and the gate check stay on
-          # api. as given - no per-mode override needed anymore.
+          # Mode D auth fix (merged to trunk in #17): Guardian (A/B) and
+          # Extract (D) derive api.->my. internally, Adapt (C) and the gate
+          # check stay on api. as given - no per-mode override needed anymore.
           echo "ASPEN_API_DOMAIN=api.securityjourney.dev" >> "$GITHUB_ENV"
 
           case "${{ github.ref_name }}" in
@@ -165,9 +165,9 @@ jobs:
 
       - name: Run Aspen (Guardian/Adapt modes)
         if: env.is_gate != 'true' && env.is_gated_mode != 'true'
-        # Mode C/D endpoint fixes only landed on gate-mode, not yet the
-        # published v0.1.2 tag - use gate-mode here too until that ships.
-        uses: SecurityJourney/aspen-connector@gate-mode
+        # Gate mode (#17) merged to trunk but hasn't been tagged/published
+        # yet - track trunk directly until a new version ships.
+        uses: SecurityJourney/aspen-connector@trunk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -189,7 +189,7 @@ jobs:
         if: env.is_gated_mode == 'true'
         id: aspen_gated
         continue-on-error: true
-        uses: SecurityJourney/aspen-connector@gate-mode
+        uses: SecurityJourney/aspen-connector@trunk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -210,16 +210,16 @@ jobs:
           fi
           echo "Gate correctly blocked before this mode's processing ran"
 
-      # Gate mode isn't published to npm/the v0.1.2 tag yet — installed from
-      # the connector's gate-mode branch directly, same as main_alt's
-      # aspen-gate-check.yml. `continue-on-error` because the non-compliant
-      # fixture is *expected* to fail this step — the real assertion (against
-      # expect_gate_outcome) is in the next step, not this one's own outcome.
+      # Gate mode isn't published to npm/tagged yet — tracks trunk directly
+      # until a new version ships. `continue-on-error` because the
+      # non-compliant fixture is *expected* to fail this step — the real
+      # assertion (against expect_gate_outcome) is in the next step, not
+      # this one's own outcome.
       - name: Run Aspen (gate check)
         if: env.is_gate == 'true'
         id: aspen_gate
         continue-on-error: true
-        uses: SecurityJourney/aspen-connector@gate-mode
+        uses: SecurityJourney/aspen-connector@trunk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
