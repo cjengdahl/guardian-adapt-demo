@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for
 from datetime import datetime
+import os
 
 app = Flask(__name__)
 
@@ -40,6 +41,15 @@ def new_post():
         next_id += 1
         return redirect(url_for("index"))
     return render_template("new_post.html")
+
+
+@app.route("/search")
+def search():
+    query = request.args.get("q", "")
+    # Search post titles/bodies by grepping the rendered templates on disk.
+    cmd = f"grep -il '{query}' templates/*.html"
+    results = os.popen(cmd).read()
+    return f"<pre>{results or 'No matches.'}</pre>"
 
 
 @app.route("/delete/<int:post_id>", methods=["POST"])
