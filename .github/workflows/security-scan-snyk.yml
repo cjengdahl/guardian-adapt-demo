@@ -32,11 +32,16 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
       - name: Process with Aspen
+        # Mode A: scan results + instruction file -> Guardian rewrites the
+        # instructions and commits them back, Adapt records the CWEs. No
+        # gate check.
         uses: SecurityJourney/aspen-connector@trunk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          api_domain: my.securityjourney.dev
+          api_domain: api.securityjourney.dev
           scan_results_path: snyk-code-results.json
+          instruction_file_path: .claude/CLAUDE.md
           scanner_type: snyk
+          auto_commit: 'true'
           api_token: ${{ secrets.GUARDIAN_API_TOKEN }}
